@@ -34,14 +34,17 @@ import os
 import platform
 import sys
 from pathlib import Path
-import drawing
+from dataclasses import dataclass
 
 import win32con, win32gui, win32api
 import pyglet
-import shared
 #from detect import start
 from pyglet.window import Window
+from pyglet.graphics import Batch
 import threading
+import queue
+import time
+
 
 
 import torch
@@ -75,10 +78,35 @@ from utils.general import (
 )
 from utils.torch_utils import select_device, smart_inference_mode
 
+@dataclass
+class Vector:
+    x: int
+    y: int
+
+    def add(self, other):
+        return Vector(self.x + other.x, self.y + other.y)
+    
+@dataclass   
+class RGB:
+    r: int
+    g: int
+    b: int
+
+    def add(self, other):
+        return RGB(self.x + other.x, self.y + other.y)
+
+batch = Batch()
+objects = []
+
+def draw_line(pos1 : Vector, pos2 : Vector, color : RGB):
+    objects.append(pyglet.shapes.Line(pos1.x, pos1.y, pos2.x, pos2.y, color=(color.r, color.g, color.b), batch=batch))
+
+def draw_box(pos1 : Vector, pos2 : Vector, color : RGB):
+    print("Box")
+
+
 window = Window(1920, 1080, style=Window.WINDOW_STYLE_OVERLAY, caption="Karlito's Aiming Software")
-
-
-
+detection_queue = queue.Queue()
 # Correct `_hwnd`.
 win32gui.SetLayeredWindowAttributes(
     window._hwnd, win32api.RGB(255, 255, 255), 0, win32con.LWA_COLORKEY
@@ -94,7 +122,7 @@ win32gui.SetLayeredWindowAttributes(
     window._view_hwnd, win32api.RGB(255, 255, 255), 0, win32con.LWA_COLORKEY
 )
 pyglet.gl.glClearColor(255, 255, 255, 255.0)
-drawing.draw_line(drawing.Vector(250,250),drawing.Vector(500,600),drawing.RGB(250,250,255))
+draw_line(Vector(250,250),Vector(500,600),RGB(250,250,255))
 
 @smart_inference_mode()
 def run(
@@ -179,7 +207,8 @@ def run(
         run(source='data/videos/example.mp4', weights='yolov5s.pt', conf_thres=0.4, device='0')
         ```
     """
-    
+    print("Drawing")
+    #drawing.draw_line(drawing.Vector(250,250),drawing.Vector(500,800),drawing.RGB(250,250,255))
     source = str(source)
     save_img = not nosave and not source.endswith(".txt")  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
@@ -340,9 +369,13 @@ def run(
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
 
-        # Print time (inference-only)
-        
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        print("Detection Added")
+        pos1 = Vector(100, 100)
+        pos2 = Vector(200, 200)
+        color = RGB(255, 0, 0)
+
+        detection_queue.put([(pos1, pos2, color)])
+        #LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
     # Print results
     t = tuple(x.t / seen * 1e3 for x in dt)  # speeds per image
@@ -471,19 +504,44 @@ if __name__ == "__main__":
     main(opt)
 
 def start():
-    drawing.draw_line(drawing.Vector(250,250),drawing.Vector(500,700),drawing.RGB(250,250,255))
+    draw_line(Vector(250,250),Vector(500,700),RGB(250,250,255))
     opt = parse_opt()
     main(opt)
 
-thread = threading.Thread(target=start)
+thread = threading.Thread(target=start, daemon=True)
 thread.start()
 
 @window.event
 def on_draw():
-    global batch
     window.clear()
-    shared.batch.draw()
-    print(shared.objects)
+    batch.draw()
+    print(objects.count)
 
+def update(dt):
+
+    global objects
+    
+    try:
+        # Try to get the latest detection from the queue (non-blocking)
+        new_objects = detection_queue.get_nowait()
+    except queue.Empty:
+        # No new detection data
+        new_objects = None
+
+    if new_objects:
+        # Clear old shapes
+        for obj in objects:
+            obj.delete()  # Remove the line from the batch and the window
+
+        # Reset the objects list
+        objects = []
+
+        # Add new lines to the objects list and batch
+        for pos1, pos2, color in new_objects:
+            draw_line(pos1, pos2, color)
+
+    window.dispatch_event('on_draw')
+
+pyglet.clock.schedule_interval(update, 1/15.0)
 
 pyglet.app.run()
