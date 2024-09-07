@@ -122,7 +122,7 @@ win32gui.SetLayeredWindowAttributes(
     window._view_hwnd, win32api.RGB(255, 255, 255), 0, win32con.LWA_COLORKEY
 )
 pyglet.gl.glClearColor(255, 255, 255, 255.0)
-draw_line(Vector(250,250),Vector(500,600),RGB(250,250,255))
+#draw_line(Vector(250,250),Vector(500,600),RGB(250,250,255))
 
 @smart_inference_mode()
 def run(
@@ -207,7 +207,6 @@ def run(
         run(source='data/videos/example.mp4', weights='yolov5s.pt', conf_thres=0.4, device='0')
         ```
     """
-    print("Drawing")
     #drawing.draw_line(drawing.Vector(250,250),drawing.Vector(500,800),drawing.RGB(250,250,255))
     source = str(source)
     save_img = not nosave and not source.endswith(".txt")  # save inference images
@@ -288,7 +287,7 @@ def run(
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
-            seen += 1
+            seen += 1  
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
                 s += f"{i}: "
@@ -313,10 +312,17 @@ def run(
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
+                    #print(xyxy)
                     c = int(cls)  # integer class
                     label = names[c] if hide_conf else f"{names[c]}"
                     confidence = float(conf)
                     confidence_str = f"{confidence:.2f}"
+                    print(label + " " + confidence_str)
+                    pos1 = Vector(200, 250)
+                    pos2 = Vector(300, 350)
+                    color = RGB(255, 0, 0)
+
+                    detection_queue.put([(pos1, pos2, color)])
 
                     if save_csv:
                         write_to_csv(p.name, label, confidence_str)
@@ -326,8 +332,10 @@ def run(
                             coords = (
                                 (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
                             )  # normalized xywh
+                            
                         else:
                             coords = (torch.tensor(xyxy).view(1, 4) / gn).view(-1).tolist()  # xyxy
+                            print(coords)
                         line = (cls, *coords, conf) if save_conf else (cls, *coords)  # label format
                         with open(f"{txt_path}.txt", "a") as f:
                             f.write(("%g " * len(line)).rstrip() % line + "\n")
@@ -336,6 +344,7 @@ def run(
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f"{names[c]} {conf:.2f}")
                         annotator.box_label(xyxy, label, color=colors(c, True))
+                        print(xyxy)
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
 
@@ -369,12 +378,8 @@ def run(
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
 
-        print("Detection Added")
-        pos1 = Vector(100, 100)
-        pos2 = Vector(200, 200)
-        color = RGB(255, 0, 0)
+        #print("Detection Added")
 
-        detection_queue.put([(pos1, pos2, color)])
         #LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
     # Print results
@@ -504,7 +509,7 @@ if __name__ == "__main__":
     main(opt)
 
 def start():
-    draw_line(Vector(250,250),Vector(500,700),RGB(250,250,255))
+    #draw_line(Vector(250,250),Vector(500,700),RGB(250,250,255))
     opt = parse_opt()
     main(opt)
 
@@ -515,31 +520,24 @@ thread.start()
 def on_draw():
     window.clear()
     batch.draw()
-    print(objects.count)
 
 def update(dt):
 
     global objects
     
     try:
-        # Try to get the latest detection from the queue (non-blocking)
         new_objects = detection_queue.get_nowait()
     except queue.Empty:
-        # No new detection data
         new_objects = None
 
     if new_objects:
-        # Clear old shapes
         for obj in objects:
-            obj.delete()  # Remove the line from the batch and the window
+            obj.delete()
 
-        # Reset the objects list
         objects = []
-
-        # Add new lines to the objects list and batch
         for pos1, pos2, color in new_objects:
             draw_line(pos1, pos2, color)
-
+    
     window.dispatch_event('on_draw')
 
 pyglet.clock.schedule_interval(update, 1/15.0)
