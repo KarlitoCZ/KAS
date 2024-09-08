@@ -36,6 +36,7 @@ import sys
 import config
 from pathlib import Path
 from dataclasses import dataclass
+from pynput import keyboard, mouse
 
 import win32con, win32gui, win32api
 import pyglet
@@ -115,6 +116,8 @@ ObjectCount = 0
 ObjectCountCache = 0
 Objects = {}
 
+key_held = False
+
 class CacheObject:
     def __init__(self, obj_type, **kwargs):
         self.type = obj_type
@@ -190,6 +193,39 @@ win32gui.SetLayeredWindowAttributes(
 )
 pyglet.gl.glClearColor(255, 255, 255, 255.0)
 #draw_line(Vector(250,250),Vector(500,600),RGB(250,250,255))
+
+
+# key listeners
+
+def on_press(key):
+    global key_held
+    try:
+        if key.name == config.key:
+            key_held = True
+    except AttributeError:
+        pass
+
+def on_release(key):
+    global key_held
+    try:
+        if key.name == config.key:
+            key_held = False
+    except AttributeError:
+        pass
+
+def on_click(x, y, button, pressed):
+        global key_held
+        if button.name == config.key:  # Detect if the left mouse button is pressed
+            if pressed:
+                key_held = True
+            else:
+                key_held = False
+
+def start_listener():
+    with mouse.Listener(on_click=on_click) as listener_mouse:
+        listener_mouse.join()
+    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+        listener.join()
 
 @smart_inference_mode()
 def run(
@@ -365,13 +401,19 @@ def run(
 
                         if y > 900 and config.game == "cs2" : continue
 
-                        #draw_box((100, 100), (200, 200))
                         draw_line((display_get_width() / 2, 0), (x, y), color=(255, 0, 0), width=1)
 
                         if is_in_fov(x, y, config.fov) :
-                            pyautogui.click()
-                            win32api.mouse_event(win32con.MOUSEEVENTF_ABSOLUTE, 100, 100, 0, 0)
-                            
+                            if key_held == True:
+                                
+
+                                dx = x - int(display_get_width() / 2)
+                                dy = y - int(display_get_height() / 2)
+                                #print(dx)
+                                win32api.mouse_event(0x0001, dx, int(dy / 2), 0, 0)
+                                #pyautogui.moveRel(dx, dy, config.smoothing)
+
+                                pyautogui.click()
                     
                         
                     if save_crop:
@@ -460,37 +502,39 @@ def start():
 thread = threading.Thread(target=start, daemon=True)
 thread.start()
 
+thread_key = threading.Thread(target=start_listener, daemon=True)
+thread_key.start()
+
 @window.event
 def on_draw():
     window.clear()
 
-    for i in range(ObjectCount):
-        obj = get_object_by_index(i)
-        if obj:
-            if obj.type == 'Line':
-                pos1 = obj.kwargs['pos1']
-                pos2 = obj.kwargs['pos2']
-                color = obj.kwargs['color']
-                width = obj.kwargs['width']
-                pyglet.shapes.Line(pos1[0], pos1[1], pos2[0], pos2[1], width=width, color=color, batch=batch).draw()
+    if config.overlay == True:
+        for i in range(ObjectCount):
+            obj = get_object_by_index(i)
+            if obj:
+                if obj.type == 'Line':
+                    pos1 = obj.kwargs['pos1']
+                    pos2 = obj.kwargs['pos2']
+                    color = obj.kwargs['color']
+                    width = obj.kwargs['width']
+                    pyglet.shapes.Line(pos1[0], pos1[1], pos2[0], pos2[1], width=width, color=color, batch=batch).draw()
 
-            elif obj.type == 'Text':
-                screen_pos = obj.kwargs['screen_pos']
-                text = obj.kwargs['text']
-                label = pyglet.text.Label(text, x=screen_pos[0], y=screen_pos[1], color=(*obj.kwargs['color'], 255), batch=batch)
-                label.draw()
+                elif obj.type == 'Text':
+                    screen_pos = obj.kwargs['screen_pos']
+                    text = obj.kwargs['text']
+                    label = pyglet.text.Label(text, x=screen_pos[0], y=screen_pos[1], color=(*obj.kwargs['color'], 255), batch=batch)
+                    label.draw()
 
     
 
-    batch.draw()
-
-    #reset()
-    #c_update()
+        batch.draw()
 
 def update(dt):
     window.dispatch_event('on_draw')
 
 pyglet.clock.schedule_interval(update, 1/30.0)
-arc = pyglet.shapes.Arc(display_get_width() / 2, display_get_height() / 2, config.fov, color=(200, 200, 200), batch = batch)
+if config.overlay == True:
+    arc = pyglet.shapes.Arc(display_get_width() / 2, display_get_height() / 2, config.fov, color=(200, 200, 200), batch = batch)
 pyglet.app.run()
 
