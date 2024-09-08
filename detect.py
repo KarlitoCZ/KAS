@@ -479,6 +479,7 @@ def on_draw():
                 text = obj.kwargs['text']
                 label = pyglet.text.Label(text, x=screen_pos[0], y=screen_pos[1], color=(*obj.kwargs['color'], 255), batch=batch)
                 label.draw()
+
     
 
     batch.draw()
@@ -490,5 +491,6 @@ def update(dt):
     window.dispatch_event('on_draw')
 
 pyglet.clock.schedule_interval(update, 1/30.0)
-
+arc = pyglet.shapes.Arc(display_get_width() / 2, display_get_height() / 2, config.fov, color=(200, 200, 200), batch = batch)
 pyglet.app.run()
+
