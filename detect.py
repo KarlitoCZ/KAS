@@ -96,14 +96,47 @@ class RGB:
         return RGB(self.x + other.x, self.y + other.y)
 
 batch = Batch()
-objects = []
+
+ObjectCount = 0
+ObjectCountCache = 0
+Objects = {}
+
+class CacheObject:
+    def __init__(self, obj_type, **kwargs):
+        self.type = obj_type
+        self.kwargs = kwargs
+
+def update_object(obj):
+    global ObjectCountCache
+    Objects[ObjectCountCache] = obj
+    ObjectCountCache += 1
 
 def draw_line(pos1 : Vector, pos2 : Vector, color : RGB):
-    objects.append(pyglet.shapes.Line(pos1.x, pos1.y, pos2.x, pos2.y, color=(color.r, color.g, color.b), batch=batch))
+    global ObjectCountCache
+    obj = CacheObject('Line', pos1=pos1, pos2=pos2, color=color, width=1)
+    update_object(obj)
 
-def draw_box(pos1 : Vector, pos2 : Vector, color : RGB):
-    print("Box")
+def reset():
+    global ObjectCountCache
+    ObjectCountCache = 0
 
+def c_update():
+    global ObjectCount
+    ObjectCount = ObjectCountCache
+
+def get_object_by_index(index):
+    return Objects.get(index, None)
+
+def draw_box(topleft, downright, color=(0, 255, 0), width=2):
+    draw_line(topleft, (downright[0], topleft[1]), color, width)
+    draw_line(topleft, (topleft[0], downright[1]), color, width)
+    draw_line((downright[0], topleft[1]), downright, color, width)
+    draw_line((topleft[0], downright[1]), downright, color, width)
+
+def draw_text(screen_pos, text, color=(255, 255, 255)):
+    global ObjectCountCache
+    obj = CacheObject('Text', screen_pos=screen_pos, text=text, color=color)
+    update_object(obj)
 
 window = Window(1920, 1080, style=Window.WINDOW_STYLE_OVERLAY, caption="Karlito's Aiming Software")
 detection_queue = queue.Queue()
@@ -317,12 +350,10 @@ def run(
                     label = names[c] if hide_conf else f"{names[c]}"
                     confidence = float(conf)
                     confidence_str = f"{confidence:.2f}"
-                    print(label + " " + confidence_str)
-                    pos1 = Vector(200, 250)
-                    pos2 = Vector(300, 350)
-                    color = RGB(255, 0, 0)
+                    #print(label + " " + confidence_str)
+                    
 
-                    detection_queue.put([(pos1, pos2, color)])
+                    
 
                     if save_csv:
                         write_to_csv(p.name, label, confidence_str)
@@ -335,7 +366,7 @@ def run(
                             
                         else:
                             coords = (torch.tensor(xyxy).view(1, 4) / gn).view(-1).tolist()  # xyxy
-                            print(coords)
+
                         line = (cls, *coords, conf) if save_conf else (cls, *coords)  # label format
                         with open(f"{txt_path}.txt", "a") as f:
                             f.write(("%g " * len(line)).rstrip() % line + "\n")
@@ -344,7 +375,26 @@ def run(
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f"{names[c]} {conf:.2f}")
                         annotator.box_label(xyxy, label, color=colors(c, True))
-                        print(xyxy)
+                        coords = (
+                                (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
+                            )
+                        #print(coords)
+                        f_x : float = coords[0]
+                        f_y : float = coords[1]
+                        #print("Y : {}".format(y))
+                        x : int = int(f_x * 1920)
+                        y : int = int((1 - f_y) * (1080 - 1))
+
+                        #print("X : {}".format(x))
+                        #print("Y : {}".format(y))
+                        
+                        reset()
+
+                        #draw_box((100, 100), (200, 200))
+                        draw_line((1920 / 2, 0), (x, y), color=(0, 0, 255))
+                        #draw_text((150, 150), 'Object Detected', color=(255, 255, 0))
+
+                        c_update()
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
 
@@ -378,7 +428,6 @@ def run(
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
                     vid_writer[i].write(im0)
 
-        #print("Detection Added")
 
         #LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
@@ -519,25 +568,26 @@ thread.start()
 @window.event
 def on_draw():
     window.clear()
+
+    for i in range(ObjectCount):
+        obj = get_object_by_index(i)
+        if obj:
+            if obj.type == 'Line':
+                pos1 = obj.kwargs['pos1']
+                pos2 = obj.kwargs['pos2']
+                color = obj.kwargs['color']
+                width = obj.kwargs['width']
+                pyglet.shapes.Line(pos1[0], pos1[1], pos2[0], pos2[1], width=width, color=color, batch=batch).draw()
+
+            elif obj.type == 'Text':
+                screen_pos = obj.kwargs['screen_pos']
+                text = obj.kwargs['text']
+                label = pyglet.text.Label(text, x=screen_pos[0], y=screen_pos[1], color=(*obj.kwargs['color'], 255), batch=batch)
+                label.draw()
+
     batch.draw()
 
 def update(dt):
-
-    global objects
-    
-    try:
-        new_objects = detection_queue.get_nowait()
-    except queue.Empty:
-        new_objects = None
-
-    if new_objects:
-        for obj in objects:
-            obj.delete()
-
-        objects = []
-        for pos1, pos2, color in new_objects:
-            draw_line(pos1, pos2, color)
-    
     window.dispatch_event('on_draw')
 
 pyglet.clock.schedule_interval(update, 1/15.0)
