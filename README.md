@@ -1,6 +1,6 @@
 ### Karlito's Aiming Software
 IA. Powered aimbot and trigger-bot for general use in python
-This cheat is a proof of concept not anywhere close to being as powerful as an external or internal cheat
+This cheat is a proof of concept and not anywhere close to being as powerful as an external or internal cheat
 
 ### Common Problems
 1. The model used in the repo is not trained on specific characters in games
