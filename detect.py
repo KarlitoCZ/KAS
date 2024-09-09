@@ -40,7 +40,6 @@ from pynput import keyboard, mouse
 
 import win32con, win32gui, win32api
 import pyglet
-#from detect import start
 from pyglet.window import Window
 from pyglet.graphics import Batch
 import threading
@@ -145,17 +144,19 @@ def get_object_by_index(index):
     return Objects.get(index, None)
 
 def draw_box(x, y, w, h, color=(255, 0, 0), width=1):
-     # Calculate the four corners based on x, y, w, and h
-    topleft = Vector(x, y)
-    topright = Vector(x + w, y)
-    bottomleft = Vector(x, y + h)
-    bottomright = Vector(x + w, y + h)
+    half_w = w / 2
+    half_h = h / 2
     
-    # Draw the four lines for the box
-    draw_line(topleft, topright, color, width)  # Top
-    draw_line(topleft, bottomleft, color, width)  # Left
-    draw_line(topright, bottomright, color, width)  # Right
-    draw_line(bottomleft, bottomright, color, width)  # Bottom
+    top_left = (x - half_w, y - half_h)
+    top_right = (x + half_w, y - half_h)
+    bottom_left = (x - half_w, y + half_h)
+    bottom_right = (x + half_w, y + half_h)
+    
+    draw_line(top_left, top_right, color, width)      
+    draw_line(top_right, bottom_right, color, width) 
+    draw_line(bottom_right, bottom_left, color, width) 
+    draw_line(bottom_left, top_left, color, width)
+    
     
 def draw_text(screen_pos, text, color=(255, 255, 255)):
     global ObjectCountCache
@@ -396,25 +397,31 @@ def run(
                             )
                         f_x : float = coords[0]
                         f_y : float = coords[1]
+                        f_w : float = coords[2]
+                        f_h : float = coords[3]
                         x : int = int(f_x * display_get_width())
                         y : int = int((1 - f_y) * (display_get_height() - 1))
+                        w : int = int(f_w * display_get_width())
+                        h : int = int(f_h * display_get_width())
 
                         if y > 900 and config.game == "cs2" : continue
 
                         draw_line((display_get_width() / 2, 0), (x, y), color=(255, 0, 0), width=1)
+                        draw_box(x, y, w, h, color=(255, 0, 0), width=1)
 
                         if is_in_fov(x, y, config.fov) :
                             if key_held == True:
-                                
+                                pyautogui.click()
 
+                        if is_in_fov(x, y, config.fov_aimbot):
+                            if key_held == True:
                                 dx = x - int(display_get_width() / 2)
                                 dy = y - int(display_get_height() / 2)
-                                #print(dx)
-                                win32api.mouse_event(0x0001, dx, int(dy / 2), 0, 0)
-                                #pyautogui.moveRel(dx, dy, config.smoothing)
+                                
+                                win32api.mouse_event(0x0001, dx, int(dy / 3), 0, 0)
+                                win32api.mouse_event(0x0001, dx, int(dy / 3), 0, 0)
+                                win32api.mouse_event(0x0001, dx, int(dy / 3), 0, 0)
 
-                                pyautogui.click()
-                    
                         
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / "crops" / names[c] / f"{p.stem}.jpg", BGR=True)
@@ -536,5 +543,6 @@ def update(dt):
 pyglet.clock.schedule_interval(update, 1/30.0)
 if config.overlay == True:
     arc = pyglet.shapes.Arc(display_get_width() / 2, display_get_height() / 2, config.fov, color=(200, 200, 200), batch = batch)
+    arc_aimbot = pyglet.shapes.Arc(display_get_width() / 2, display_get_height() / 2, config.fov_aimbot, color=(244, 0, 0), batch = batch)
 pyglet.app.run()
 
