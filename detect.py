@@ -46,6 +46,7 @@ import threading
 import queue
 import pyautogui
 import math
+import time
 import win32api, win32con
 
 
@@ -412,14 +413,16 @@ def run(
                         if is_in_fov(x, y, config.fov) :
                             if key_held == True:
                                 pyautogui.click()
+                                time.sleep(0.05)
+                                pyautogui.click()
+                                time.sleep(0.05)
+                                pyautogui.click()
 
                         if is_in_fov(x, y, config.fov_aimbot):
                             if key_held == True:
                                 dx = x - int(display_get_width() / 2)
                                 dy = y - int(display_get_height() / 2)
                                 
-                                win32api.mouse_event(0x0001, dx, int(dy / 3), 0, 0)
-                                win32api.mouse_event(0x0001, dx, int(dy / 3), 0, 0)
                                 win32api.mouse_event(0x0001, dx, int(dy / 3), 0, 0)
 
                         
