@@ -14,7 +14,7 @@ This cheat is a proof of concept and not anywhere close to being as powerful as 
 5. If you encounter a problem please open an issue or make a PR.
 6. Check out the config.py
    
-### Modifing
+### Modifying
 I highly recommend changing the code or the model to fit your needs, 
 you can find the main logic is in detect.py.
 If you train your own AI. model and modify the aimbot it will work way better.
