@@ -16,7 +16,7 @@ This cheat is a proof of concept and not anywhere close to being as powerful as 
    
 ### Modifying
 I highly recommend changing the code or the model to fit your needs, 
-you can find the main logic is in detect.py.
+you can find the main logic in detect.py.
 If you train your own AI. model and modify the aimbot it will work way better.
 
 ### Sources
