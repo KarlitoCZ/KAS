@@ -1,5 +1,5 @@
 ### Karlito's Aiming Software
-IA. Powered aimbot and trigger-bot for general use in python
+AI. Powered aimbot and trigger-bot for general use in python
 This cheat is a proof of concept and not anywhere close to being as powerful as an external or internal cheat
 
 ### Common Problems
